@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	PORT = "8088"
+	PORT = ":8088"
 )
 
 var (
