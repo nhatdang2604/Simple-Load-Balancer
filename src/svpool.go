@@ -27,14 +27,14 @@ func (sp *ServerPool) GetNextBackend() *Backend {
 
 		//If the tested backend is alive
 		// => choose the backend
-		if s.Backends[idx].Alive {
+		if s.Backends[idx].IsAlive() {
 			if i != next {
 				atomic.StoreUint64(&sp.Current, uint64(idx))
 			}
 			return sp.Backends[idx]
 		}
 	}
-
+	
 	//Return nil if all the backends are down
 	return nil
 }
