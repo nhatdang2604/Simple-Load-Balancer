@@ -38,3 +38,15 @@ func (sp *ServerPool) GetNextBackend() *Backend {
 	//Return nil if all the backends are down
 	return nil
 }
+
+//Set the status of the backend with the given url with the value alive
+func (sp *ServerPool) MarkBackendStatus(backendURL *url.URL, alive bool) {
+	
+	//Find the backend with the given url
+	for _, backend := range sp.Backends {
+		if backendURL == backend.URL {
+			backend.SetAlive(alive)
+			return
+		}
+	}
+} 
