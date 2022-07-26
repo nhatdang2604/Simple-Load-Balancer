@@ -4,10 +4,14 @@ import (
 	"./backend"
 	"./svpool"	
 	"net/http"
+	"net/url"
+	"net/http/httputil"
 )
 
 const (
-	PORT = ":8088"
+	PORT_SERVER_POOL = ":8088"
+	PORTS_BACKEND = []string{":8089", ":8090"}
+	IP = "http://localhost"
 )
 
 var (
@@ -33,6 +37,31 @@ func LoadBalance(writer http.ResponseWriter, request *http.Request) {
 	selectedBackend.ReverseProxy.ServeHTTP(writer, request)
 }
 
-func main (
+//Parse the ip string to the url, but with only 1 return value
+func ParseURL(u string)(res *url.URL) {
+	temp, err := url.Parse(u)
+	res = &temp
+	if nil != err {
+		res = nil
+	}
 
+	return
+}
+
+func main (
+	
+	serverPool := ServerPool{
+		Backends: []*Backend{
+			Backend{
+				URL: ParseURL(IP + PORTS_BACKEND[0])
+				Alive: true
+			}
+		}
+	}
+
+	//Iterate over all the backends
+	for _, backend := range serverPool.Backends {
+		reverseProxy := httputil.NewSingleHostReverseProxy(backend.URL)
+	}
+	
 )
