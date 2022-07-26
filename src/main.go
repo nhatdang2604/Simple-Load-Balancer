@@ -3,15 +3,22 @@ package main
 import (
 	"./backend"
 	"./svpool"	
+	
 	"net/http"
 	"net/url"
 	"net/http/httputil"
+
+	"log"
+	"time"
 )
 
 const (
 	PORT_SERVER_POOL = ":8088"
 	PORTS_BACKEND = []string{":8089", ":8090"}
 	IP = "http://localhost"
+
+	MAX_RETRY_COUNT = 3	//max number of retries to resend the request to the backend
+	DELAY_TIME = 10 * time.Millisecond	//time to delay after retry to send request to backend, after error: 10ms
 )
 
 var (
@@ -48,12 +55,24 @@ func ParseURL(u string)(res *url.URL) {
 	return
 }
 
+func GetRetryFromContext(request *http.Request) int  {
+	//TODO:
+
+	return 0
+}
+
 func main (
 	
+	//Initialize for the server pool
 	serverPool := ServerPool{
 		Backends: []*Backend{
-			Backend{
+			&Backend{
 				URL: ParseURL(IP + PORTS_BACKEND[0])
+				Alive: true
+			},
+
+			&Backend{
+				URL: ParseURL(IP + PORTS_BACKEND[1])
 				Alive: true
 			}
 		}
@@ -62,6 +81,28 @@ func main (
 	//Iterate over all the backends
 	for _, backend := range serverPool.Backends {
 		reverseProxy := httputil.NewSingleHostReverseProxy(backend.URL)
+		
+		reverseProxy.ErrorHandler = func(writer http.ResponseWriter, request *http.Request, err, error) {
+		log.Printf("[%s] %s\n", backend.URL.Host, err.Error())
+		
+	
+		retries := GetRetryFromContext(request)
+		
+		//Try to resend the request, if number of retry is not exceed the MAX_RETRY_COUNT
+		if retries < MAX_RETRY_COUNT {
+			select {
+				
+				//time.After return a channel => must use select to retrieve
+				case <- time.After(DELAY_TIME):
+				
+				
+
+			}
+		}
+		
+		
+	}
+		
 	}
 	
 )
