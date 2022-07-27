@@ -4,8 +4,9 @@ import (
 	"./backend"
 	"./svpool"	
 	
-	"net/http"
+	"net"
 	"net/url"
+	"net/http"
 	"net/http/httputil"
 
 	"log"
@@ -19,6 +20,8 @@ const (
 
 	MAX_RETRY_COUNT = 3	//max number of retries to resend the request to the backend
 	DELAY_TIME = 10 * time.Millisecond	//time to delay after retry to send request to backend, after error: 10ms
+	
+	HEALTHCHECK_TIMEOUT_TIME = 2 * time.Second	//time of the timeout to the tcp connection to check if the backend is down
 
 	Attempts int = iota
 	Retry
@@ -54,6 +57,21 @@ func LoadBalance(writer http.ResponseWriter, request *http.Request) {
 
 	//Else, pass the request to the backend
 	selectedBackend.ReverseProxy.ServeHTTP(writer, request)
+}
+
+
+//Check if the backend is alive by establishing a TCP connection
+func isBackendAlive(u *url.URL) bool {
+	connection, err := net.DialTimeout("tcp", u.Host, HEALTHCHECK_TIMEOUT_TIME)
+
+	if nil != err {
+		log.Println("SIte unreachable, error: ", err)
+		return false
+	}
+
+	_ = connection.Close()
+	return true
+
 }
 
 //Parse the ip string to the url, but with only 1 return value
