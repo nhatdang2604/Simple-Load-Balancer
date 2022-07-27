@@ -19,8 +19,8 @@ const (
 
 	MAX_RETRY_COUNT = 3	//max number of retries to resend the request to the backend
 	DELAY_TIME = 10 * time.Millisecond	//time to delay after retry to send request to backend, after error: 10ms
-	
 	HEALTHCHECK_TIMEOUT_TIME = 2 * time.Second	//time of the timeout to the tcp connection to check if the backend is down
+	HEALTHCHECK_INTERVAL_TIME = 20 * time.Second	//time between 2 turns of health check
 
 	Attempts int = iota
 	Retry
@@ -85,10 +85,23 @@ func GetValueFromContext(request *http.Request, id int) int {
 	return 0
 }
 
+//Healthcheck infinitively, HEALTHCHECK_INTERVAL_TIME per turn
+func HealthCheck(serverPool svpool.ServerPool) {
+	t := time.NewTicker(HEALTHCHECK_INTERVAL_TIME)
+	for {
+		select {
+			case <- t.C:
+				log.Println("Starting health check...")
+				serverPool.HealthCheck()
+				log.Println("Healthcheck completed")
+		}
+	}
+}
+
 func main (
 	
 	//Initialize for the server pool
-	serverPool := ServerPool{
+	serverPool := svpool.ServerPool{
 		Backends: []*Backend{
 			&Backend{
 				URL: ParseURL(IP + PORTS_BACKEND[0])
@@ -137,7 +150,10 @@ func main (
 		LoadBalance(writer, request.WithContext(ctx))
 		
 	}
-		
+	
 	}
+
+	//Start health check
+	go HealthCheck(serverPool)
 	
 )
