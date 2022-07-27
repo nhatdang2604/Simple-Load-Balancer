@@ -19,6 +19,9 @@ const (
 
 	MAX_RETRY_COUNT = 3	//max number of retries to resend the request to the backend
 	DELAY_TIME = 10 * time.Millisecond	//time to delay after retry to send request to backend, after error: 10ms
+
+	Attempts int = iota
+	Retry
 )
 
 var (
@@ -65,13 +68,17 @@ func ParseURL(u string)(res *url.URL) {
 }
 
 func GetRetryFromContext(request *http.Request) int  {
-	//TODO:
-
-	return 0
+	return GetValueFromContext(request, Retry)
 }
 
 func GetAttemptFromContext(request *http.Request) int {
-	//TODO:
+	return GetValueFromContext(request, Attempts)
+}
+
+func GetValueFromContext(request *http.Request, id int) int {
+	if value, ok := request.Context().Value(id).(int); ok {
+		return value 
+	}
 
 	return 0
 }
