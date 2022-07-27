@@ -26,15 +26,6 @@ const (
 	Retry
 )
 
-var (
-	serverPool = svpool.ServerPool
-
-	server = http.Server {
-		Addr:		PORT
-		Handler:	http.HanlderFunc(loadBalance)
-	}
-)
-
 //Load balances the incoming request
 func LoadBalance(writer http.ResponseWriter, request *http.Request) {
 
@@ -100,6 +91,12 @@ func HealthCheck(serverPool svpool.ServerPool) {
 
 func main (
 	
+	//Initalize the http server
+	server := http.Server {
+		Addr:	PORT_SERVER_POOL
+		Handler: http.HandleFunc(LoadBalance)
+	}
+
 	//Initialize for the server pool
 	serverPool := svpool.ServerPool{
 		Backends: []*Backend{
@@ -150,10 +147,17 @@ func main (
 		LoadBalance(writer, request.WithContext(ctx))
 		
 	}
-	
+		
+		//Set the init reverse proxy for the backend
+		backend.ReverseProxy = reverseProxy
 	}
 
 	//Start health check
 	go HealthCheck(serverPool)
 	
+	//Run the server
+	log.Printf("Load Balancer started at : %d\n", PORT_SERVER_POOL)
+	if err := server.ListenAndServe(); nil != err {
+		log.Fatal(err)
+	}
 )
