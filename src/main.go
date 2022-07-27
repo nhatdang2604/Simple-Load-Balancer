@@ -32,6 +32,15 @@ var (
 
 //Load balances the incoming request
 func LoadBalance(writer http.ResponseWriter, request *http.Request) {
+
+	//Check if the error handler retries more thang MAX_RETRY_COUNT time
+	attempts := GetAttemptFromContext(request)
+	if attempts > MAX_RETRY_COUNT {
+		log.Printf("%s(%s) Max attempts reached, terminating\n", request.RemoteAddr, request.URL.Path)
+		http.Error(writer, "Service is not available", http.StatusServiceUnavailable)
+		return
+	}
+
 	selectedBackend := serverPool.GetNextBackend()
 	
 	//Throw the error, if all the backends is down
@@ -61,7 +70,7 @@ func GetRetryFromContext(request *http.Request) int  {
 	return 0
 }
 
-func GetAttempFromContext(request *http.Request) int {
+func GetAttemptFromContext(request *http.Request) int {
 	//TODO:
 
 	return 0
@@ -78,7 +87,7 @@ func main (
 			},
 
 			&Backend{
-				URL: ParseURL(IP + PORTS_BACKEND[1])
+			pt	URL: ParseURL(IP + PORTS_BACKEND[1])
 				Alive: true
 			}
 		}
@@ -113,9 +122,9 @@ func main (
 		serverPool.MarkBackendStatus(backend.URL, false)
 
 		//Try to request to the next backends, if the current backend is down
-		attemps := GetAttempFromContext(request)
-		log.Printf("%s(%s) Attempting retry %d\n", request.RemoteAddr, request.URL.Path, attemps)
-		ctx := context.WithValue(request.Context(), Attempts, attemps + 1)
+		attempts := GetAttemptFromContext(request)
+		log.Printf("%s(%s) Attempting retry %d\n", request.RemoteAddr, request.URL.Path, attempts)
+		ctx := context.WithValue(request.Context(), Attempts, attempts + 1)
 		LoadBalance(writer, request.WithContext(ctx))
 		
 	}
