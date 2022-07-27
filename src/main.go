@@ -61,6 +61,12 @@ func GetRetryFromContext(request *http.Request) int  {
 	return 0
 }
 
+func GetAttempFromContext(request *http.Request) int {
+	//TODO:
+
+	return 0
+}
+
 func main (
 	
 	//Initialize for the server pool
@@ -94,12 +100,23 @@ func main (
 				
 				//time.After return a channel => must use select to retrieve
 				case <- time.After(DELAY_TIME):
-				
+					ctx := context.WithValue(request.Context(), Retry, retries + 1)
+					reverseProxy.serveHTTP(writer, request.WithContext(context))
 				
 
 			}
+			
+			return
 		}
-		
+
+		//After MAX_RETRY_COUNT retries, mark this backend is down
+		serverPool.MarkBackendStatus(backend.URL, false)
+
+		//Try to request to the next backends, if the current backend is down
+		attemps := GetAttempFromContext(request)
+		log.Printf("%s(%s) Attempting retry %d\n", request.RemoteAddr, request.URL.Path, attemps)
+		ctx := context.WithValue(request.Context(), Attempts, attemps + 1)
+		LoadBalance(writer, request.WithContext(ctx))
 		
 	}
 		
