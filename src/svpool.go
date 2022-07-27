@@ -3,6 +3,7 @@ package svpool
 import (
 	"./backend"
 	"sync/atomic"
+	"net"
 )
 
 type ServerPool struct {
@@ -49,4 +50,20 @@ func (sp *ServerPool) MarkBackendStatus(backendURL *url.URL, alive bool) {
 			return
 		}
 	}
-} 
+}
+
+//Check if the backend is alive by establishing a TCP connection
+func isBackendAlive(u *url.URL) bool {
+        connection, err := net.DialTimeout("tcp", u.Host, HEALTHCHECK_TIMEOUT_TIME)
+
+        if nil != err {
+                log.Println("SIte unreachable, error: ", err)
+                return false
+        }
+
+        _ = connection.Close()
+        return true
+
+}
+
+

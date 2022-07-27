@@ -4,7 +4,6 @@ import (
 	"./backend"
 	"./svpool"	
 	
-	"net"
 	"net/url"
 	"net/http"
 	"net/http/httputil"
@@ -57,21 +56,6 @@ func LoadBalance(writer http.ResponseWriter, request *http.Request) {
 
 	//Else, pass the request to the backend
 	selectedBackend.ReverseProxy.ServeHTTP(writer, request)
-}
-
-
-//Check if the backend is alive by establishing a TCP connection
-func isBackendAlive(u *url.URL) bool {
-	connection, err := net.DialTimeout("tcp", u.Host, HEALTHCHECK_TIMEOUT_TIME)
-
-	if nil != err {
-		log.Println("SIte unreachable, error: ", err)
-		return false
-	}
-
-	_ = connection.Close()
-	return true
-
 }
 
 //Parse the ip string to the url, but with only 1 return value
