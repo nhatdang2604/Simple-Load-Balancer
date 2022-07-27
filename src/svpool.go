@@ -53,7 +53,7 @@ func (sp *ServerPool) MarkBackendStatus(backendURL *url.URL, alive bool) {
 }
 
 //Check if the backend is alive by establishing a TCP connection
-func isBackendAlive(u *url.URL) bool {
+func IsBackendAlive(u *url.URL) bool {
         connection, err := net.DialTimeout("tcp", u.Host, HEALTHCHECK_TIMEOUT_TIME)
 
         if nil != err {
@@ -66,4 +66,18 @@ func isBackendAlive(u *url.URL) bool {
 
 }
 
+//Ping all the backends and update the status
+func (sp *ServerPool) HealthCheck() {
+	for _, backend := range sp.Backends {
+		
+		alive := IsBackendAlive(backend.URL)
+		backend.SetAlive(alive)
+		
+		status := "up"
+		if !alive {
+			status = "down"
+		}
 
+		log.Printf("%s [%s]\n", backend.URL, status)
+	}
+}
