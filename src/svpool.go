@@ -1,9 +1,11 @@
-package svpool
+package main
 
 import (
-	"./backend"
+	//"LoadBalancer/src/backend"
+	"log"
 	"sync/atomic"
 	"net"
+	"net/url"
 )
 
 type ServerPool struct {
@@ -12,7 +14,7 @@ type ServerPool struct {
 }
 
 func (sp *ServerPool) NextIndex() int {
-	return int(atomic.AddUint64(&sp.Current, uint64(1)) % uint64(len(s.Backends)))
+	return int(atomic.AddUint64(&sp.Current, uint64(1)) % uint64(len(sp.Backends)))
 }
 
 //Return next alive backend to take a connection
@@ -23,12 +25,12 @@ func (sp *ServerPool) GetNextBackend() *Backend {
 	size := len(sp.Backends)
 	end := size + next;		//start from the 'next' and move a full cycle
 
-	for i := next; i < end; ++i {
+	for i := next; i < end; i++ {
 		idx := i % size		//the index of the backend in sp.Backends
 
 		//If the tested backend is alive
 		// => choose the backend
-		if s.Backends[idx].IsAlive() {
+		if sp.Backends[idx].IsAlive() {
 			if i != next {
 				atomic.StoreUint64(&sp.Current, uint64(idx))
 			}
@@ -57,7 +59,7 @@ func IsBackendAlive(u *url.URL) bool {
         connection, err := net.DialTimeout("tcp", u.Host, HEALTHCHECK_TIMEOUT_TIME)
 
         if nil != err {
-                log.Println("SIte unreachable, error: ", err)
+                log.Println("Site unreachable, error: ", err)
                 return false
         }
 

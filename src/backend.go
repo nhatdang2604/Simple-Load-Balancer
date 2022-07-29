@@ -1,4 +1,4 @@
-package backend
+package main
 
 import (
 	"net/url"
@@ -16,7 +16,7 @@ type Backend struct {
 //Setter for Alive attribute for the backend with avoid race condition
 func (backend *Backend) SetAlive(alive bool) {
 	backend.Mux.Lock()
-	defer backend.Mux.UnLock()
+	defer backend.Mux.Unlock()
 
 	backend.Alive = alive
 }
@@ -25,7 +25,7 @@ func (backend *Backend) SetAlive(alive bool) {
 //Getter for Alive attribute for the backend with avoid race condition
 func (backend *Backend) IsAlive() (alive bool){
 	backend.Mux.RLock()
-	defer backend.Mux.RUnLock()
+	defer backend.Mux.RUnlock()
 
 	alive = backend.Alive
 	return

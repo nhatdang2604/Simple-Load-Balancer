@@ -1,8 +1,8 @@
 package main
 
 import (
-	"./backend"
-	"./svpool"	
+	//"LoadBalancer/src/backend"
+	//"LoadBalancer/src/svpool"	
 	
 	"net/url"
 	"net/http"
@@ -10,11 +10,25 @@ import (
 
 	"log"
 	"time"
+	"context"
+)
+
+var (
+	//Port number for each backend
+	ports = []string{":8089", ":8090", ":8091", ":8092", ":8093"}
+	
+	//Initalize the http server
+	server = http.Server {
+		Addr:	PORT_SERVER_POOL,
+		Handler: http.HandlerFunc(LoadBalance),
+	}
+
+	//Initialize for the server pool
+	serverPool = ServerPool{}
 )
 
 const (
 	PORT_SERVER_POOL = ":8088"
-	PORTS_BACKEND = []string{":8089", ":8090"}
 	IP = "http://localhost"
 
 	MAX_RETRY_COUNT = 3	//max number of retries to resend the request to the backend
@@ -52,7 +66,7 @@ func LoadBalance(writer http.ResponseWriter, request *http.Request) {
 //Parse the ip string to the url, but with only 1 return value
 func ParseURL(u string)(res *url.URL) {
 	temp, err := url.Parse(u)
-	res = &temp
+	res = temp
 	if nil != err {
 		res = nil
 	}
@@ -77,7 +91,7 @@ func GetValueFromContext(request *http.Request, id int) int {
 }
 
 //Healthcheck infinitively, HEALTHCHECK_INTERVAL_TIME per turn
-func HealthCheck(serverPool svpool.ServerPool) {
+func HealthCheck(serverPool ServerPool) {
 	t := time.NewTicker(HEALTHCHECK_INTERVAL_TIME)
 	for {
 		select {
@@ -89,64 +103,50 @@ func HealthCheck(serverPool svpool.ServerPool) {
 	}
 }
 
-func main (
-	
-	//Initalize the http server
-	server := http.Server {
-		Addr:	PORT_SERVER_POOL
-		Handler: http.HandleFunc(LoadBalance)
-	}
+func main() {
 
-	//Initialize for the server pool
-	serverPool := svpool.ServerPool{
-		Backends: []*Backend{
-			&Backend{
-				URL: ParseURL(IP + PORTS_BACKEND[0])
-				Alive: true
-			},
-
-			&Backend{
-			pt	URL: ParseURL(IP + PORTS_BACKEND[1])
-				Alive: true
-			}
-		}
+	//Create len(ports) backends
+	for _ = range ports {
+		serverPool.Backends = append(serverPool.Backends, &Backend{Alive: true})
 	}
 
 	//Iterate over all the backends
-	for _, backend := range serverPool.Backends {
+	for i, backend := range serverPool.Backends {
+		
+		//Set the ports for each backend
+		backend.URL = ParseURL(IP + ports[i])
+
+		//Building and set the reverseProxy for each backend
 		reverseProxy := httputil.NewSingleHostReverseProxy(backend.URL)
+		reverseProxy.ErrorHandler = func(writer http.ResponseWriter, request *http.Request, err error) {
+			log.Printf("[%s] %s\n", backend.URL.Host, err.Error())
 		
-		reverseProxy.ErrorHandler = func(writer http.ResponseWriter, request *http.Request, err, error) {
-		log.Printf("[%s] %s\n", backend.URL.Host, err.Error())
+			retries := GetRetryFromContext(request)
 		
-	
-		retries := GetRetryFromContext(request)
-		
-		//Try to resend the request, if number of retry is not exceed the MAX_RETRY_COUNT
-		if retries < MAX_RETRY_COUNT {
-			select {
+			//Try to resend the request, if number of retry is not exceed the MAX_RETRY_COUNT
+			if retries < MAX_RETRY_COUNT {
+				select {
 				
-				//time.After return a channel => must use select to retrieve
-				case <- time.After(DELAY_TIME):
-					ctx := context.WithValue(request.Context(), Retry, retries + 1)
-					reverseProxy.serveHTTP(writer, request.WithContext(context))
+					//time.After return a channel => must use select to retrieve
+					case <- time.After(DELAY_TIME):
+						ctx := context.WithValue(request.Context(), Retry, retries + 1)
+						reverseProxy.ServeHTTP(writer, request.WithContext(ctx))
 				
 
-			}
+				}
 			
-			return
+				return
+			}
+
+			//After MAX_RETRY_COUNT retries, mark this backend is down
+			serverPool.MarkBackendStatus(backend.URL, false)
+
+			//Try to request to the next backends, if the current backend is down
+			attempts := GetAttemptFromContext(request)
+			log.Printf("%s(%s) Attempting retry %d\n", request.RemoteAddr, request.URL.Path, attempts)
+			ctx := context.WithValue(request.Context(), Attempts, attempts + 1)
+			LoadBalance(writer, request.WithContext(ctx))
 		}
-
-		//After MAX_RETRY_COUNT retries, mark this backend is down
-		serverPool.MarkBackendStatus(backend.URL, false)
-
-		//Try to request to the next backends, if the current backend is down
-		attempts := GetAttemptFromContext(request)
-		log.Printf("%s(%s) Attempting retry %d\n", request.RemoteAddr, request.URL.Path, attempts)
-		ctx := context.WithValue(request.Context(), Attempts, attempts + 1)
-		LoadBalance(writer, request.WithContext(ctx))
-		
-	}
 		
 		//Set the init reverse proxy for the backend
 		backend.ReverseProxy = reverseProxy
@@ -156,8 +156,8 @@ func main (
 	go HealthCheck(serverPool)
 	
 	//Run the server
-	log.Printf("Load Balancer started at : %d\n", PORT_SERVER_POOL)
+	log.Printf("Load Balancer started at : %s\n", PORT_SERVER_POOL[1:])
 	if err := server.ListenAndServe(); nil != err {
 		log.Fatal(err)
 	}
-)
+}
